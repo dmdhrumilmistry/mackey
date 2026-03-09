@@ -11,6 +11,8 @@ native secure credential store.
   encrypted at rest and protected by the operating system.
 - **Namespaced services** — group related keys under a named _service_ so
   multiple projects can share the same Keychain without conflict.
+- **Process injection** — `mackey exec -- <cmd>` runs any program with secrets
+  injected as environment variables without exposing them to the parent shell.
 - **Shell integration** — `mackey env` prints stored key-value pairs as
   `export KEY=value` statements that can be sourced directly into a shell
   session.
@@ -92,6 +94,33 @@ mackey --service myapp set SECRET_KEY "supersecret"
 mackey --service myapp get SECRET_KEY
 mackey --service myapp list
 ```
+
+### Run any application with secrets as environment variables
+
+`mackey exec` is the primary way to expose keychain secrets to applications that
+read configuration from environment variables (Node.js, Python, Ruby, Docker,
+etc.). It loads all stored keys for the service, adds them to the child
+process's environment, and then executes the command — secrets are never
+written to disk or exposed in the parent shell.
+
+```bash
+# Store secrets once
+mackey set DATABASE_URL "postgres://user:pass@host/db"
+mackey set REDIS_URL "redis://localhost:6379"
+
+# Run your app with the secrets injected
+mackey exec -- node server.js
+mackey exec -- python manage.py runserver
+mackey exec -- docker-compose up
+
+# Use a custom service namespace per project
+mackey --service myapp exec -- ./my-binary
+```
+
+The child process inherits the current shell environment (PATH, HOME, …) plus
+all secrets from the Keychain service. The secrets are **not** visible in the
+parent shell's environment; they are passed directly to the child process via
+its own environment block.
 
 ## Go Library Usage
 

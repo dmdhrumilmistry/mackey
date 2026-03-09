@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 
 	"github.com/zalando/go-keyring"
 )
@@ -16,7 +17,13 @@ var ErrNotFound = errors.New("keystore: key not found")
 // manifestKey is a reserved key used to track all stored keys for a service.
 const manifestKey = "__mackey_manifest__"
 
+// validKeyRe matches POSIX-conformant environment variable names:
+// starts with a letter or underscore, followed by letters, digits, or underscores.
+var validKeyRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
 // Set stores a key-value pair in the macOS Keychain under the given service name.
+// Key must be a valid POSIX environment variable name (letters, digits, underscores;
+// must not start with a digit).
 func Set(service, key, value string) error {
 	if service == "" {
 		return fmt.Errorf("keystore: service name must not be empty")
@@ -26,6 +33,9 @@ func Set(service, key, value string) error {
 	}
 	if key == manifestKey {
 		return fmt.Errorf("keystore: key name %q is reserved", manifestKey)
+	}
+	if !validKeyRe.MatchString(key) {
+		return fmt.Errorf("keystore: key %q is not a valid environment variable name (use letters, digits, underscores; must not start with a digit)", key)
 	}
 	if err := keyring.Set(service, key, value); err != nil {
 		return err

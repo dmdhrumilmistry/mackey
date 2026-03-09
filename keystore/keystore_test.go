@@ -142,6 +142,26 @@ func TestValidationErrors(t *testing.T) {
 			fn:      func() error { _, err := keystore.List(""); return err },
 			wantErr: true,
 		},
+		{
+			name:    "Set key starting with digit",
+			fn:      func() error { return keystore.Set("svc", "1INVALID", "v") },
+			wantErr: true,
+		},
+		{
+			name:    "Set key with hyphen",
+			fn:      func() error { return keystore.Set("svc", "INVALID-KEY", "v") },
+			wantErr: true,
+		},
+		{
+			name:    "Set key with space",
+			fn:      func() error { return keystore.Set("svc", "INVALID KEY", "v") },
+			wantErr: true,
+		},
+		{
+			name:    "Set valid key with underscore",
+			fn:      func() error { return keystore.Set("svc-valid", "_VALID_KEY", "v") },
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
