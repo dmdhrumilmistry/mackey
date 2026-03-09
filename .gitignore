@@ -1,0 +1,16 @@
+# Binaries
+mackey
+mackey.exe
+
+# Build output
+/dist/
+*.out
+
+# Go test cache
+*.test
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
