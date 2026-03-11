@@ -18,11 +18,30 @@ var execCmd = &cobra.Command{
 pairs for the service injected into its environment. Secrets are never written
 to disk and are not visible in the parent shell's environment.
 
+All subprocesses spawned by the child command inherit the same environment, so
+secrets are available throughout the entire process tree.
+
+Shell expansion note:
+  Variables like $SECRET_KEY are expanded by your shell BEFORE mackey runs, so
+  the shell substitutes an empty string when the variable is not set in the
+  parent shell. To reference injected secrets inside the command, wrap it in a
+  shell invocation using single quotes:
+
+    mackey exec -- sh -c 'echo $SECRET_KEY'
+
 Examples:
 
+  # Run an application that reads env vars at startup
   mackey exec -- node server.js
-  mackey exec -- python app.py
-  mackey exec --service myapp -- docker-compose up`,
+  mackey exec -- python manage.py runserver
+  mackey exec --service myapp -- docker-compose up
+
+  # Print a specific secret (no shell expansion issues)
+  mackey exec -- printenv SECRET_KEY
+
+  # Use shell features that reference injected variables
+  mackey exec -- sh -c 'echo $SECRET_KEY'
+  mackey exec -- sh -c 'curl -H "Authorization: Bearer $API_TOKEN" https://api.example.com'`,
 	// At least the command to run must be provided.
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
