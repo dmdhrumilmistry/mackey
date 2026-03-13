@@ -120,7 +120,30 @@ mackey --service myapp exec -- ./my-binary
 The child process inherits the current shell environment (PATH, HOME, …) plus
 all secrets from the Keychain service. The secrets are **not** visible in the
 parent shell's environment; they are passed directly to the child process via
-its own environment block.
+its own environment block. Any subprocesses spawned by the child also inherit
+the same environment, so secrets are available throughout the entire process tree.
+
+> **Shell expansion gotcha:** Variables like `$SECRET_KEY` are expanded by your
+> shell *before* mackey runs, so the shell substitutes an empty string when the
+> variable is not set in the parent shell. The correct ways to reference injected
+> variables are:
+>
+> ```bash
+> # ❌ Wrong — $SECRET_KEY is expanded by the parent shell (empty string)
+> mackey exec -- echo $SECRET_KEY
+>
+> # ✅ Correct — printenv reads directly from the child's environment
+> mackey exec -- printenv SECRET_KEY
+>
+> # ✅ Correct — single quotes prevent parent-shell expansion; sh resolves the
+> #              variable after the secrets are already in the environment
+> mackey exec -- sh -c 'echo $SECRET_KEY'
+> mackey exec -- sh -c 'curl -H "Authorization: Bearer $API_TOKEN" https://api.example.com'
+> ```
+>
+> Applications (Node.js, Python, etc.) that call `process.env.SECRET_KEY` or
+> `os.environ["SECRET_KEY"]` at startup work correctly without any quoting tricks
+> because they read the environment *after* mackey has injected the secrets.
 
 ## Go Library Usage
 

@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"bytes"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -128,5 +130,75 @@ func TestBuildExecEnvPreservesParent(t *testing.T) {
 		if !found {
 			t.Errorf("parent var %q missing from child env; env=%v", want, env)
 		}
+	}
+}
+
+// TestExecChildProcessReceivesSecrets is an integration test that actually
+// spawns a child process and verifies it receives the injected secrets.
+// It uses printenv (POSIX) to read the value of the env var from the child's
+// environment without any shell-expansion ambiguity.
+func TestExecChildProcessReceivesSecrets(t *testing.T) {
+	const svc = "exec-test-child"
+	const key = "MACKEY_CHILD_SECRET"
+	const val = "child-secret-value"
+
+	if err := keystore.Set(svc, key, val); err != nil {
+		t.Fatalf("keystore.Set: %v", err)
+	}
+	t.Cleanup(func() { _ = keystore.Delete(svc, key) })
+
+	env, err := buildExecEnv(svc, []string{"PATH=/usr/bin:/bin"})
+	if err != nil {
+		t.Fatalf("buildExecEnv: %v", err)
+	}
+
+	// Use printenv to read the injected variable — no shell expansion involved.
+	var out bytes.Buffer
+	child := exec.Command("printenv", key) //nolint:gosec // key is a test constant, not user input
+	child.Env = env
+	child.Stdout = &out
+
+	if err := child.Run(); err != nil {
+		t.Fatalf("child process failed: %v", err)
+	}
+
+	got := strings.TrimRight(out.String(), "\n")
+	if got != val {
+		t.Errorf("child process got %q for %s, want %q", got, key, val)
+	}
+}
+
+// TestExecSubprocessInheritsSecrets verifies that grandchild processes (spawned
+// by the child) also inherit the injected environment, because environment
+// variables are inherited across the entire process tree.
+func TestExecSubprocessInheritsSecrets(t *testing.T) {
+	const svc = "exec-test-grandchild"
+	const key = "MACKEY_GRANDCHILD_SECRET"
+	const val = "grandchild-secret-value"
+
+	if err := keystore.Set(svc, key, val); err != nil {
+		t.Fatalf("keystore.Set: %v", err)
+	}
+	t.Cleanup(func() { _ = keystore.Delete(svc, key) })
+
+	env, err := buildExecEnv(svc, []string{"PATH=/usr/bin:/bin"})
+	if err != nil {
+		t.Fatalf("buildExecEnv: %v", err)
+	}
+
+	// Use sh -c 'printenv KEY' to simulate a subprocess (sh) spawning another
+	// process (printenv). The secret must be available in the grandchild.
+	var out bytes.Buffer
+	child := exec.Command("sh", "-c", "printenv "+key) //nolint:gosec // key is a test constant, command injection not possible
+	child.Env = env
+	child.Stdout = &out
+
+	if err := child.Run(); err != nil {
+		t.Fatalf("child process failed: %v", err)
+	}
+
+	got := strings.TrimRight(out.String(), "\n")
+	if got != val {
+		t.Errorf("grandchild process got %q for %s, want %q", got, key, val)
 	}
 }
