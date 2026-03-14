@@ -10,9 +10,13 @@ import (
 
 var service string
 
+// Version is set at build time via -ldflags.
+var Version = "dev"
+
 var rootCmd = &cobra.Command{
-	Use:   "mackey",
-	Short: "mackey – secure key-value store backed by the macOS Keychain",
+	Use:     "mackey",
+	Version: Version,
+	Short:   "mackey – secure key-value store backed by the macOS Keychain",
 	Long: `mackey stores and retrieves key-value pairs using the macOS Keychain so
 that you never need to keep sensitive values in .env files or environment
 variables again.`,
